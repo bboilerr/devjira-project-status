@@ -1,9 +1,10 @@
 {
-  "name": "@risingstack/rest-api-typescript",
+  "name": "devjira-project-status",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
   "scripts": {
+    "start": "node dist/index.js",
     "build": "tsc",
     "dev": "tsc --watch & nodemon dist",
     "test": "tsc && mocha dist/**/*.spec.js",
@@ -12,11 +13,15 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "@types/node": "7.0.22",
+    "csv": "^2.0.0",
     "express": "4.15.3",
-    "nodemon": "1.11.0"
+    "jira-client": "^6.4.1",
+    "minimist": "^1.2.0",
+    "nodemon": "1.11.0",
+    "request": "^2.85.0"
   },
   "devDependencies": {
     "@types/mocha": "2.2.41",

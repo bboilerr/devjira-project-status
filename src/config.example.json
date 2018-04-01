@@ -1,0 +1,14 @@
+{
+    "jira": {
+        "protocol": "https",
+        "host": "devjira.inin.com",
+        "username": "USERNAME",
+        "password": "PASSWORD"
+    },
+    "searches": [
+        {
+            "name": "DP-2033",
+            "jql": "(project = xIC OR project = CoreWebIC OR project = Web) AND (fixVersion = DP-2033) ORDER BY Rank ASC"
+        }
+    ]
+}
