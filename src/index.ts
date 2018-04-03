@@ -1,43 +1,74 @@
 import * as minimist from 'minimist';
-import { config } from './config';
+import { config, Config, Search } from './config';
+import JiraReportDataGenerator from './JiraReportDataGenerator';
+import Spreadsheet from './Spreadsheet';
+import { ReportData } from './types';
 
 interface CommandLineArguments {
     _: Array<string>,
     search?: string
 }
 
-function usage() {
-    console.log(`usage: npm start -- --search <searchName>`);
-}
+class App {
+    private jiraReportDataGenerator: JiraReportDataGenerator;
+    private jiraSearch: Search;
+    private jiraReportData: ReportData;
+    private spreadsheet: Spreadsheet;
 
-const args = <CommandLineArguments>minimist(process.argv.slice(2));
+    constructor(private config: Config) {
+    }
 
-if (!args.search) {
-    console.error('Search name not specified.');
-    usage();
-    process.exit();
-}
+    private usage() {
+        console.log(`usage: npm start -- --search <searchName>`);
+    }
 
-if (!config.searches.length) {
-    console.error('Must have searches configured in config.json');
-    usage();
-    process.exit();
-}
+    public async execute() {
+        const args = <CommandLineArguments>minimist(process.argv.slice(2));
 
-let jiraSearch = null
-for (let configuredSearch of config.searches) {
-    if (configuredSearch.name === args.search) {
-        jiraSearch = configuredSearch;
-        break;
+        if (!args.search) {
+            console.error('Search name not specified.');
+            this.usage();
+            process.exit();
+        }
+
+        if (!this.config.searches.length) {
+            console.error('Must have searches configured in config.json');
+            this.usage();
+            process.exit();
+        }
+
+        for (let configuredSearch of this.config.searches) {
+            if (configuredSearch.name === args.search) {
+                this.jiraSearch = configuredSearch;
+                break;
+            }
+        }
+
+        if (!this.jiraSearch) {
+            console.error(`Search name "${args.search}" not found in config.json. Configured searches: ${this.config.searches.map(x => x.name).join(', ')}`);
+            this.usage();
+            process.exit();
+        }
+
+        this.jiraReportDataGenerator = new JiraReportDataGenerator(this.config, this.jiraSearch);
+
+        try {
+            this.jiraReportData = await this.jiraReportDataGenerator.generate();
+        } catch (error) {
+            console.error(`Error generating Jira report data: ${error}`);
+            console.error(error);
+            process.exit();
+        }
+        
+        try {
+            this.spreadsheet = new Spreadsheet(this.jiraReportData, this.jiraSearch);
+            await this.spreadsheet.generate();
+        } catch (error) {
+            console.error(`Error generating spreadsheet: ${error}`);
+            console.error(error);
+        }
     }
 }
 
-if (!jiraSearch) {
-    console.error(`Search name "${args.search}" not found in config.json. Configured searches: ${config.searches.map(x => x.name).join(', ')}`);
-    usage();
-    process.exit();
-}
-
-import App from './App';
-let app = new App(config, jiraSearch);
+let app = new App(config);
 app.execute();

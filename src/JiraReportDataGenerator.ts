@@ -1,36 +1,12 @@
 import * as JiraApi from 'jira-client';
 import { Config, Search } from './config';
 import * as _ from 'lodash';
-
-interface Sprint {
-    id: number,
-    name: string,
-    state: string,
-    startDate: string,
-    endDate: string,
-    completedDate: string
-}
-
-interface ReportDataIssue {
-    issue: string,
-    uri: string,
-    assignee: string,
-    issueType: string,
-    status: string,
-    summary: string,
-    sprint: Sprint,
-    epic: string,
-    storyPoints: number,
-    storyPointsRemaining: number
-}
-
-interface ReportData {
-    reportDataIssues: Array<ReportDataIssue>,
-}
+import * as moment from 'moment';
+import { Sprint, ReportDataIssue, ReportData } from './types';
 
 const ISSUES_PER_SEARCH = 50;
 
-export default class App {
+export default class JiraReportDataGenerator {
     private express;
     private jira;
     private jiraFields;
@@ -60,6 +36,7 @@ export default class App {
             return fieldsMap;
         } catch (error) {
             console.error(`Error getting Jira Fields: ${error}`);
+            console.error(error);
             throw error;
         }
     }
@@ -71,6 +48,7 @@ export default class App {
             return await this.jira.searchJira(search.jql, {startAt: startAt, maxResults: maxResults});
         } catch (error) {
             console.error(`Error performing jira search: ${error}`);
+            console.error(error);
             throw error;
         }
     }
@@ -92,6 +70,7 @@ export default class App {
             return issues;
         } catch (error) {
             console.error(`Error getting Jira search results: ${error}`);
+            console.error(error);
             throw error;
         }
     }
@@ -107,6 +86,7 @@ export default class App {
             const FIELD_EPIC_NAME = this.jiraFields.byName['Epic Name'].id;
             const FIELD_STORY_POINTS = this.jiraFields.byName['Story Points'].id;
             const FIELD_TIME_SPENT = this.jiraFields.byName['Time Spent'].id;
+            const FIELD_CREATED = this.jiraFields.byName['Created'].id;
             let issuesByKey = this.jiraIssues.reduce((map, issue) => {
                 map[issue.key] = issue;
                 return map;
@@ -119,6 +99,7 @@ export default class App {
                 reportDataIssue.assignee = ((FIELD_ASSIGNEE in issue.fields) && issue.fields[FIELD_ASSIGNEE] && issue.fields[FIELD_ASSIGNEE].displayName);
                 reportDataIssue.issueType = ((FIELD_ISSUE_TYPE in issue.fields) && issue.fields[FIELD_ISSUE_TYPE] && issue.fields[FIELD_ISSUE_TYPE].name);
                 reportDataIssue.summary = ((FIELD_SUMMARY in issue.fields) && issue.fields[FIELD_SUMMARY]);
+                reportDataIssue.created = ((FIELD_CREATED in issue.fields) && issue.fields[FIELD_CREATED]);
                 reportDataIssue.status = ((FIELD_STATUS in issue.fields) && issue.fields[FIELD_STATUS] && issue.fields[FIELD_STATUS].name);
                 reportDataIssue.storyPoints = ((FIELD_STORY_POINTS in issue.fields) && issue.fields[FIELD_STORY_POINTS]);
                 reportDataIssue.storyPointsRemaining = null;
@@ -128,6 +109,8 @@ export default class App {
                         // Time spent in work days
                         timeSpent /= (60 * 60 * 8);
                         reportDataIssue.storyPointsRemaining = reportDataIssue.storyPoints - timeSpent;
+                    } else {
+                        reportDataIssue.storyPointsRemaining = reportDataIssue.storyPoints;
                     }
                 }
                 reportDataIssue.sprint = null;
@@ -146,12 +129,16 @@ export default class App {
                         } else if (data[0] === 'startDate') {
                             sprint.startDate = data[1];
                         } else if (data[0] === 'endDate') {
-                            sprint.endDate = data[1];
+                            sprint.endDate = moment(data[1]).toISOString();
                         } else if (data[0] === 'completedDate') {
-                            sprint.completedDate = data[1];
+                            sprint.completedDate = moment(data[1]).toISOString();
                         }
                     }
-                    reportDataIssue.sprint = sprint;
+
+                    // If an issue isn't resolved and its latest sprint is closed, then it's a backlog item (no sprint).
+                    if (!(reportDataIssue.status !== 'Resolved' && sprint.state === 'CLOSED')) {
+                        reportDataIssue.sprint = sprint;
+                    }
                 }
                 reportDataIssue.epic = null;
                 if ((FIELD_EPIC_NAME in issue.fields) && issue.fields[FIELD_EPIC_NAME]) {
@@ -218,23 +205,22 @@ export default class App {
             return reportData;
         } catch (error) {
             console.error(`Error generating report data: ${error}`);
+            console.error(error);
             throw error;
         }
     }
 
-    private async doJira() {
+    public async generate() {
         try {
             this.jiraFields = await this.getJiraFields();
             this.jiraIssues = await this.getJiraSearchResults(this.jiraSearch);
             console.log(`Retrieved ${this.jiraIssues.length} issues`);
             this.reportData = await this.generateReportData();
-            console.log(JSON.stringify(this.reportData, null, 4));
+            return this.reportData;
         } catch (error) {
             console.error(`Error performing jira tasks: ${error}`);
+            console.error(error);
+            throw error;
         }
-    }
-
-    public execute() {
-        this.doJira();
     }
 }

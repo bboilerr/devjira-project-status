@@ -19,4 +19,10 @@ export interface Config {
     searches: Array<Search>
 }
 
-export const config = <Config>JSON.parse(fs.readFileSync('src/config.json').toString());
+export let config: Config = null;
+try {
+    config = <Config>JSON.parse(fs.readFileSync('src/config.json').toString());
+} catch (error) {
+    console.error(`Error loading config: ${error}`);
+    process.exit();
+}
