@@ -134,303 +134,320 @@ export default class Spreadsheet {
         return sprints;
     }
 
-    private async generateSpreadsheet(auth) {
-        let title = `${this.jiraSearch.name} - Project Status - ${moment().format('MM/DD/YYYY hh:mm:ss A')}`;
-        console.log(`Generating spreadsheet: ${title}`);
+    private generateSpreadsheetPromise(auth) {
+        return new Promise((resolve, reject) => {
+            let title = `${this.jiraSearch.name} - Project Status - ${moment().format('MM/DD/YYYY hh:mm:ss A')}`;
+            console.log(`Generating spreadsheet: ${title}`);
+            let sprints = this.processReportData(this.reportData);
+            let sheetsToAdd = [];
+            for (let sprint of sprints) {
+                let sheet = {
+                    properties: {
+                        title: sprint.sprint,
+                    },
+                    data: []
+                };
 
-        let sprints = this.processReportData(this.reportData);
-        let sheetsToAdd = [];
-        for (let sprint of sprints) {
-            let sheet = {
-                properties: {
-                    title: sprint.sprint,
-                },
-                data: []
-            };
-
-            // resolved story points
-            let resolvedStoryPoints = sprint.issues.reduce((val, issue) => {
-                if (issue.status === 'Resolved' && issue.storyPoints) {
-                    val += issue.storyPoints;
-                }
-                return val;
-            }, 0);
-            // unresolved story points
-            let unresolvedStoryPoints = sprint.issues.reduce((val, issue) => {
-                if (issue.status !== 'Resolved' && issue.storyPoints) {
-                    val += issue.storyPoints;
-                }
-                return val;
-            }, 0);
-            // unresolved story points remaining
-            let unresolvedStoryPointsRemaining = sprint.issues.reduce((val, issue) => {
-                if (issue.status !== 'Resolved' && issue.storyPointsRemaining) {
-                    val += issue.storyPointsRemaining;
-                }
-                return val;
-            }, 0);
-            // user story points
-            let userStoryPoints = sprint.issues.reduce((users, issue) => {
-                if (!(issue.assignee in users)) {
-                    users[issue.assignee] = {
-                        resolvedStoryPoints: 0,
-                        unresolvedStoryPoints: 0,
-                        unresolvedStoryPointsRemaining: 0
-                    };
-                }
-
-                if (issue.storyPoints) {
-                    if (issue.status === 'Resolved') {
-                        users[issue.assignee].resolvedStoryPoints += issue.storyPoints;
-                    } else {
-                        users[issue.assignee].unresolvedStoryPoints += issue.storyPoints;
+                // resolved story points
+                let resolvedStoryPoints = sprint.issues.reduce((val, issue) => {
+                    if (issue.status === 'Resolved' && issue.storyPoints) {
+                        val += issue.storyPoints;
                     }
-                }
-                if (issue.storyPointsRemaining && issue.status !== 'Resolved') {
-                    users[issue.assignee].unresolvedStoryPointsRemaining += issue.storyPointsRemaining;
-                }
-                return users;
-            }, {});
+                    return val;
+                }, 0);
+                // unresolved story points
+                let unresolvedStoryPoints = sprint.issues.reduce((val, issue) => {
+                    if (issue.status !== 'Resolved' && issue.storyPoints) {
+                        val += issue.storyPoints;
+                    }
+                    return val;
+                }, 0);
+                // unresolved story points remaining
+                let unresolvedStoryPointsRemaining = sprint.issues.reduce((val, issue) => {
+                    if (issue.status !== 'Resolved' && issue.storyPointsRemaining) {
+                        val += issue.storyPointsRemaining;
+                    }
+                    return val;
+                }, 0);
+                // user story points
+                let userStoryPoints = sprint.issues.reduce((users, issue) => {
+                    if (!(issue.assignee in users)) {
+                        users[issue.assignee] = {
+                            resolvedStoryPoints: 0,
+                            unresolvedStoryPoints: 0,
+                            unresolvedStoryPointsRemaining: 0
+                        };
+                    }
 
-            let statRowData = [
-                {
-                    values: [
-                        { userEnteredValue: { stringValue: 'Sprint' } },
-                        { userEnteredValue: { stringValue: sprint.sprint } },
-                    ]
-                },
-                {
-                    values: [
-                        { userEnteredValue: { stringValue: 'Resolved Story Points' } },
-                        { userEnteredValue: { numberValue: resolvedStoryPoints } },
-                    ]
-                },
-                {
-                    values: [
-                        { userEnteredValue: { stringValue: 'Unesolved Story Points' } },
-                        { userEnteredValue: { numberValue: unresolvedStoryPoints } },
-                    ]
-                },
-                {
-                    values: [
-                        { userEnteredValue: { stringValue: 'Unesolved Story Points Remaining' } },
-                        { userEnteredValue: { numberValue: unresolvedStoryPointsRemaining } },
-                    ]
-                },
-            ];
+                    if (issue.storyPoints) {
+                        if (issue.status === 'Resolved') {
+                            users[issue.assignee].resolvedStoryPoints += issue.storyPoints;
+                        } else {
+                            users[issue.assignee].unresolvedStoryPoints += issue.storyPoints;
+                        }
+                    }
+                    if (issue.storyPointsRemaining && issue.status !== 'Resolved') {
+                        users[issue.assignee].unresolvedStoryPointsRemaining += issue.storyPointsRemaining;
+                    }
+                    return users;
+                }, {});
 
-            for (let user in userStoryPoints) {
-                statRowData.push({
-                    values: [
-                        { userEnteredValue: { stringValue: `${user} - Resolved Story Points` } },
-                        { userEnteredValue: { numberValue: userStoryPoints[user].resolvedStoryPoints } },
-                    ]
-                });
-                statRowData.push({
-                    values: [
-                        { userEnteredValue: { stringValue: `${user} - Unresolved Story Points` } },
-                        { userEnteredValue: { numberValue: userStoryPoints[user].unresolvedStoryPoints } },
-                    ]
-                });
-                statRowData.push({
-                    values: [
-                        { userEnteredValue: { stringValue: `${user} - Unresolved Story Points Remaining` } },
-                        { userEnteredValue: { numberValue: userStoryPoints[user].unresolvedStoryPointsRemaining } },
-                    ]
-                });
-            }
-
-            sprint.dataHeaderStartRow = statRowData.length + 1;
-
-            sheet.data.push({
-                startRow: 0,
-                startColumn: 0,
-                rowData: statRowData
-            })
-
-            sheet.data.push({
-                startRow: sprint.dataHeaderStartRow,
-                startColumn: 0,
-                rowData: [{
-                    values: [
-                        { userEnteredValue: { stringValue: 'Epic' } },
-                        { userEnteredValue: { stringValue: 'Type' } },
-                        { userEnteredValue: { stringValue: 'Assignee' } },
-                        { userEnteredValue: { stringValue: 'Issue' } },
-                        { userEnteredValue: { stringValue: 'URI' } },
-                        { userEnteredValue: { stringValue: 'Status' } },
-                        { userEnteredValue: { stringValue: 'Story Points' } },
-                        { userEnteredValue: { stringValue: 'Story Points Remaining' } },
-                        { userEnteredValue: { stringValue: 'Summary' } }
-                    ]
-                }]
-            });
-
-            sheet.data.push({
-                startRow: sprint.dataHeaderStartRow + 1,
-                startColumn: 0,
-                rowData: sprint.issues.map(issue => {
-                    return {
+                let statRowData = [
+                    {
                         values: [
-                            { userEnteredValue: { stringValue: issue.epic } },
-                            { userEnteredValue: { stringValue: issue.issueType } },
-                            { userEnteredValue: { stringValue: issue.assignee } },
-                            { userEnteredValue: { stringValue: issue.issue } },
-                            { userEnteredValue: { stringValue: issue.uri } },
-                            { userEnteredValue: { stringValue: issue.status } },
-                            { userEnteredValue: { numberValue: issue.storyPoints } },
-                            { userEnteredValue: { numberValue: issue.storyPointsRemaining } },
-                            { userEnteredValue: { stringValue: issue.summary } }
+                            { userEnteredValue: { stringValue: 'Sprint' } },
+                            { userEnteredValue: { stringValue: sprint.sprint } },
                         ]
-                    }
-                })
-            });
-
-            sheetsToAdd.push(sheet);
-        }
-
-        const sheets = google.sheets({ version: 'v4', auth });
-        sheets.spreadsheets.create({
-            resource: {
-                properties: {
-                    title: title,
-                    locale: 'en_US',
-                    timeZone: moment.tz.guess()
-                },
-                sheets: sheetsToAdd
-            }
-        }, (error, response) => {
-            if (error) {
-                console.error(`Error creating spreadsheet: ${error}`);
-                console.error(error);
-            } else {
-                let spreadsheetId = response.data.spreadsheetId;
-
-                let sheetIds = response.data.sheets.map(sheet => {
-                    return sheet.properties.sheetId;
-                });
-
-                let requests = [];
-
-                let headerBorders = {
-                    bottom: {
-                        color: {
-                            blue: 255,
-                            green: 255,
-                            red: 255
-                        },
-                        style: 'SOLID',
-                        width: 1
                     },
-                    top: {
-                        color: {
-                            blue: 255,
-                            green: 255,
-                            red: 255
-                        },
-                        style: 'SOLID',
-                        width: 1
+                    {
+                        values: [
+                            { userEnteredValue: { stringValue: 'Resolved Story Points' } },
+                            { userEnteredValue: { numberValue: resolvedStoryPoints } },
+                        ]
                     },
-                    left: {
-                        color: {
-                            blue: 255,
-                            green: 255,
-                            red: 255
-                        },
-                        style: 'SOLID',
-                        width: 1
+                    {
+                        values: [
+                            { userEnteredValue: { stringValue: 'Unesolved Story Points' } },
+                            { userEnteredValue: { numberValue: unresolvedStoryPoints } },
+                        ]
                     },
-                    right: {
-                        color: {
-                            blue: 255,
-                            green: 255,
-                            red: 255
-                        },
-                        style: 'SOLID',
-                        width: 1
+                    {
+                        values: [
+                            { userEnteredValue: { stringValue: 'Unesolved Story Points Remaining' } },
+                            { userEnteredValue: { numberValue: unresolvedStoryPointsRemaining } },
+                        ]
                     },
-                };
+                ];
 
-                let headerRowCellFormat = {
-                    userEnteredFormat: {
-                        textFormat: {
-                            bold: true
-                        },
-                        horizontalAlignment: 'CENTER',
-                        borders: headerBorders 
-                    }
-                };
-
-                let headerColumnCellFormat = {
-                    userEnteredFormat: {
-                        textFormat: {
-                            bold: true
-                        },
-                        horizontalAlignment: 'LEFT',
-                        borders: headerBorders
-                    }
-                };
-
-                let index = 0;
-                for (let sheetId of sheetIds) {
-                    requests.push({
-                        repeatCell: {
-                            range: {
-                                sheetId: sheetId,
-                                startRowIndex: 0,
-                                endRowIndex: sprints[index].dataHeaderStartRow - 1,
-                                startColumnIndex: 0,
-                                endColumnIndex: 1
-                            },
-                            cell: headerColumnCellFormat,
-                            fields: 'userEnteredFormat(borders,textFormat,horizontalAlignment)'
-                        }
+                for (let user in userStoryPoints) {
+                    statRowData.push({
+                        values: [
+                            { userEnteredValue: { stringValue: `${user} - Resolved Story Points` } },
+                            { userEnteredValue: { numberValue: userStoryPoints[user].resolvedStoryPoints } },
+                        ]
                     });
-
-                    requests.push({
-                        repeatCell: {
-                            range: {
-                                sheetId: sheetId,
-                                startRowIndex: sprints[index].dataHeaderStartRow,
-                                endRowIndex: sprints[index].dataHeaderStartRow + 1,
-                                startColumnIndex: 0,
-                                endColumnIndex: 9
-                            },
-                            cell: headerRowCellFormat,
-                            fields: 'userEnteredFormat(borders,textFormat,horizontalAlignment)'
-                        }
+                    statRowData.push({
+                        values: [
+                            { userEnteredValue: { stringValue: `${user} - Unresolved Story Points` } },
+                            { userEnteredValue: { numberValue: userStoryPoints[user].unresolvedStoryPoints } },
+                        ]
                     });
-
-                    requests.push({
-                        autoResizeDimensions: {
-                            dimensions: {
-                                sheetId: sheetId,
-                                dimension: 'COLUMNS',
-                                startIndex: 0
-                            }
-                        }
+                    statRowData.push({
+                        values: [
+                            { userEnteredValue: { stringValue: `${user} - Unresolved Story Points Remaining` } },
+                            { userEnteredValue: { numberValue: userStoryPoints[user].unresolvedStoryPointsRemaining } },
+                        ]
                     });
-                    index++;
                 }
 
-                sheets.spreadsheets.batchUpdate({
-                    spreadsheetId: spreadsheetId,
-                    resource: {
-                        requests: requests
-                    }
-                }, (error, response) => {
-                    if (error) {
-                        console.error(`Error updating spreadsheet: ${error}`);
-                        console.error(error);
-                    } else {
+                sprint.dataHeaderStartRow = statRowData.length + 1;
 
-                    }
+                sheet.data.push({
+                    startRow: 0,
+                    startColumn: 0,
+                    rowData: statRowData
+                })
+
+                sheet.data.push({
+                    startRow: sprint.dataHeaderStartRow,
+                    startColumn: 0,
+                    rowData: [{
+                        values: [
+                            { userEnteredValue: { stringValue: 'Epic' } },
+                            { userEnteredValue: { stringValue: 'Type' } },
+                            { userEnteredValue: { stringValue: 'Assignee' } },
+                            { userEnteredValue: { stringValue: 'Issue' } },
+                            { userEnteredValue: { stringValue: 'URI' } },
+                            { userEnteredValue: { stringValue: 'Status' } },
+                            { userEnteredValue: { stringValue: 'Story Points' } },
+                            { userEnteredValue: { stringValue: 'Story Points Remaining' } },
+                            { userEnteredValue: { stringValue: 'Summary' } }
+                        ]
+                    }]
                 });
+
+                sheet.data.push({
+                    startRow: sprint.dataHeaderStartRow + 1,
+                    startColumn: 0,
+                    rowData: sprint.issues.map(issue => {
+                        return {
+                            values: [
+                                { userEnteredValue: { stringValue: issue.epic } },
+                                { userEnteredValue: { stringValue: issue.issueType } },
+                                { userEnteredValue: { stringValue: issue.assignee } },
+                                { userEnteredValue: { stringValue: issue.issue } },
+                                { userEnteredValue: { stringValue: issue.uri } },
+                                { userEnteredValue: { stringValue: issue.status } },
+                                { userEnteredValue: { numberValue: issue.storyPoints } },
+                                { userEnteredValue: { numberValue: issue.storyPointsRemaining } },
+                                { userEnteredValue: { stringValue: issue.summary } }
+                            ]
+                        }
+                    })
+                });
+
+                sheetsToAdd.push(sheet);
             }
+
+            const sheets = google.sheets({ version: 'v4', auth });
+            sheets.spreadsheets.create({
+                resource: {
+                    properties: {
+                        title: title,
+                        locale: 'en_US',
+                        timeZone: moment.tz.guess()
+                    },
+                    sheets: sheetsToAdd
+                }
+            }, (error, response) => {
+                if (error) {
+                    console.error(`Error creating spreadsheet: ${error}`);
+                    console.error(error);
+                    reject(error);
+                } else {
+                    let spreadsheetId = response.data.spreadsheetId;
+                    let spreadsheetUrl = response.data.spreadsheetUrl;
+
+                    let sheetIds = response.data.sheets.map(sheet => {
+                        return sheet.properties.sheetId;
+                    });
+
+                    let requests = [];
+
+                    let headerBorders = {
+                        bottom: {
+                            color: {
+                                blue: 255,
+                                green: 255,
+                                red: 255
+                            },
+                            style: 'SOLID',
+                            width: 1
+                        },
+                        top: {
+                            color: {
+                                blue: 255,
+                                green: 255,
+                                red: 255
+                            },
+                            style: 'SOLID',
+                            width: 1
+                        },
+                        left: {
+                            color: {
+                                blue: 255,
+                                green: 255,
+                                red: 255
+                            },
+                            style: 'SOLID',
+                            width: 1
+                        },
+                        right: {
+                            color: {
+                                blue: 255,
+                                green: 255,
+                                red: 255
+                            },
+                            style: 'SOLID',
+                            width: 1
+                        },
+                    };
+
+                    let headerRowCellFormat = {
+                        userEnteredFormat: {
+                            textFormat: {
+                                bold: true
+                            },
+                            horizontalAlignment: 'CENTER',
+                            borders: headerBorders
+                        }
+                    };
+
+                    let headerColumnCellFormat = {
+                        userEnteredFormat: {
+                            textFormat: {
+                                bold: true
+                            },
+                            horizontalAlignment: 'LEFT',
+                            borders: headerBorders
+                        }
+                    };
+
+                    let index = 0;
+                    for (let sheetId of sheetIds) {
+                        requests.push({
+                            repeatCell: {
+                                range: {
+                                    sheetId: sheetId,
+                                    startRowIndex: 0,
+                                    endRowIndex: sprints[index].dataHeaderStartRow - 1,
+                                    startColumnIndex: 0,
+                                    endColumnIndex: 1
+                                },
+                                cell: headerColumnCellFormat,
+                                fields: 'userEnteredFormat(borders,textFormat,horizontalAlignment)'
+                            }
+                        });
+
+                        requests.push({
+                            repeatCell: {
+                                range: {
+                                    sheetId: sheetId,
+                                    startRowIndex: sprints[index].dataHeaderStartRow,
+                                    endRowIndex: sprints[index].dataHeaderStartRow + 1,
+                                    startColumnIndex: 0,
+                                    endColumnIndex: 9
+                                },
+                                cell: headerRowCellFormat,
+                                fields: 'userEnteredFormat(borders,textFormat,horizontalAlignment)'
+                            }
+                        });
+
+                        requests.push({
+                            autoResizeDimensions: {
+                                dimensions: {
+                                    sheetId: sheetId,
+                                    dimension: 'COLUMNS',
+                                    startIndex: 0
+                                }
+                            }
+                        });
+                        index++;
+                    }
+
+                    sheets.spreadsheets.batchUpdate({
+                        spreadsheetId: spreadsheetId,
+                        resource: {
+                            requests: requests
+                        }
+                    }, (error, response) => {
+                        if (error) {
+                            console.error(`Error updating spreadsheet: ${error}`);
+                            console.error(error);
+                            reject(error);
+                        } else {
+                            resolve(spreadsheetUrl);
+                        }
+                    });
+                }
+            });
         });
     }
 
+    private async generateSpreadsheet(auth) {
+        let spreadsheetUrl: string = null; 
+        try {
+            spreadsheetUrl = <string> await this.generateSpreadsheetPromise(auth);
+        } catch(error) {
+            console.error(`Error generating spreadsheet: ${error}`);
+            console.error(error);
+            throw error;
+        }
+        return spreadsheetUrl;
+    }
+
     public async generate() {
+        let spreadsheetUrl: string = null;
         if (!this.clientSecret) {
             throw new Error('Client secret not found');
         }
@@ -445,7 +462,15 @@ export default class Spreadsheet {
         }
 
         if (auth) {
-            await this.generateSpreadsheet(auth);
+            try {
+                spreadsheetUrl = await this.generateSpreadsheet(auth);
+            } catch(error) {
+                console.error(`Error generating spreadsheet: ${error}`);
+                console.error(error);
+                throw error;
+            }
         }
+
+        return spreadsheetUrl;
     }
 }

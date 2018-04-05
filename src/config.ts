@@ -14,9 +14,14 @@ export interface Search {
     jql: string
 }
 
+export interface Express {
+    port: number
+}
+
 export interface Config {
     jira: JiraConfig,
-    searches: Array<Search>
+    searches: Array<Search>,
+    express: Express
 }
 
 export let config: Config = null;

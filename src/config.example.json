@@ -10,5 +10,8 @@
             "name": "DP-2033",
             "jql": "(project = xIC OR project = CoreWebIC OR project = Web) AND (fixVersion = DP-2033) ORDER BY Rank ASC"
         }
-    ]
+    ],
+    "express": {
+        "port": 3000
+    }
 }
