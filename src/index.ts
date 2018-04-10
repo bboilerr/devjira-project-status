@@ -26,7 +26,6 @@ class App {
         });
 
         this.express.post('/generate', async (req, res) => {
-            console.log(JSON.stringify(req.body, null, 4));
             if (!(req.body && req.body.search && this.config.searches.find(element => element.name === req.body.search))) {
                 res.status(404).send(`Search not found.`);
             } else {
@@ -63,6 +62,7 @@ class App {
             } catch (error) {
                 console.error(`Error generating Jira report data: ${error}`);
                 console.error(error);
+                throw error;
             }
 
             if (jiraReportData) {
@@ -72,6 +72,7 @@ class App {
                 } catch (error) {
                     console.error(`Error generating spreadsheet: ${error}`);
                     console.error(error);
+                    throw error;
                 }
             }
         }
@@ -95,8 +96,17 @@ class App {
         }
 
         if (args.search) {
-            let spreadsheetUrl = await this.generateSpreadsheetForSearch(args.search);
-            exec(`start chrome "${spreadsheetUrl}"`);
+            let spreadsheetUrl: string = null;
+            try {
+                spreadsheetUrl = await this.generateSpreadsheetForSearch(args.search);
+            } catch (error) {
+                console.error(`Error generating spreadsheet: ${error}`);
+                console.error(error);
+            }
+
+            if (spreadsheetUrl) {
+                exec(`start chrome "${spreadsheetUrl}"`);
+            }
         }
 
         if (args.serve) {

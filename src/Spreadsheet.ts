@@ -5,7 +5,7 @@ import { Sprint, ReportDataIssue, ReportData } from './types';
 import { Search } from './config';
 import { google } from 'googleapis';
 const OAuth2Client = google.auth.OAuth2;
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets'];
+const SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file'];
 const TOKEN_PATH = 'src/credentials.json';
 import { exec } from 'child_process';
 import { POINT_CONVERSION_COMPRESSED } from 'constants';
@@ -93,6 +93,44 @@ export default class Spreadsheet {
                 oAuth2Client.setCredentials(token);
                 resolve(oAuth2Client);
             }
+        });
+    }
+
+    private async getShareableSpreadsheetUrl(spreadsheetId: string, auth) {
+        return new Promise((resolve, reject) => {
+            let drive = google.drive({ version: 'v3', auth });
+            drive.permissions.create({
+                fileId: spreadsheetId,
+                resource: {
+                    role: 'reader',
+                    type: 'anyone',
+                    allowFileDiscover: true
+                }
+            }, (error, response) => {
+                if (error) {
+                    console.error(`Error creating share permission: ${error}`);
+                    console.error(error);
+                    reject(error);
+                } else {
+                    console.log(`Created share permission for spreadsheet ${spreadsheetId}`);
+                    drive.files.get({
+                        fileId: spreadsheetId,
+                        fields: 'webViewLink'
+                    }, (error, response) => {
+                        if (error) {
+                            console.error(`Error getting file information: ${error}`);
+                            console.error(error);
+                            reject(error);
+                        } else {
+                            console.log(`Created shareable spreadsheet link: ${response.data.webViewLink}`);
+                            for (let key in response.data) {
+                                console.log(`${key} = ${response.data[key]}`);
+                            }
+                            resolve(response.data.webViewLink);
+                        }
+                    });
+                }
+            });
         });
     }
 
@@ -306,7 +344,8 @@ export default class Spreadsheet {
                     reject(error);
                 } else {
                     let spreadsheetId = response.data.spreadsheetId;
-                    let spreadsheetUrl = response.data.spreadsheetUrl;
+
+                    console.log(`Created spreadsheet ${spreadsheetId}`);
 
                     let sheetIds = response.data.sheets.map(sheet => {
                         return sheet.properties.sheetId;
@@ -426,7 +465,7 @@ export default class Spreadsheet {
                             console.error(error);
                             reject(error);
                         } else {
-                            resolve(spreadsheetUrl);
+                            resolve(spreadsheetId);
                         }
                     });
                 }
@@ -435,15 +474,15 @@ export default class Spreadsheet {
     }
 
     private async generateSpreadsheet(auth) {
-        let spreadsheetUrl: string = null; 
+        let spreadsheetId: string = null; 
         try {
-            spreadsheetUrl = <string> await this.generateSpreadsheetPromise(auth);
+            spreadsheetId = <string> await this.generateSpreadsheetPromise(auth);
         } catch(error) {
             console.error(`Error generating spreadsheet: ${error}`);
             console.error(error);
             throw error;
         }
-        return spreadsheetUrl;
+        return spreadsheetId;
     }
 
     public async generate() {
@@ -461,11 +500,20 @@ export default class Spreadsheet {
             throw error;
         }
 
+        let spreadsheetId = null;
         if (auth) {
             try {
-                spreadsheetUrl = await this.generateSpreadsheet(auth);
+                spreadsheetId = await this.generateSpreadsheet(auth);
             } catch(error) {
                 console.error(`Error generating spreadsheet: ${error}`);
+                console.error(error);
+                throw error;
+            }
+
+            try {
+                spreadsheetUrl = <string> await this.getShareableSpreadsheetUrl(spreadsheetId, auth);
+            } catch (error) {
+                console.error(`Error getting shareable spreadsheet url: ${error}`);
                 console.error(error);
                 throw error;
             }
