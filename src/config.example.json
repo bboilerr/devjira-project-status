@@ -2,16 +2,35 @@
     "jira": {
         "protocol": "https",
         "host": "devjira.inin.com",
-        "username": "USERNAME",
-        "password": "PASSWORD"
+        "username": "<USERNAME>",
+        "password": "<PASSWORD>"
     },
     "searches": [
         {
-            "name": "DP-2033",
-            "jql": "(project = xIC OR project = CoreWebIC OR project = Web) AND (fixVersion = DP-2033) ORDER BY Rank ASC"
+            "name": "DP-2033_Push_1",
+            "jql": "(project = xIC OR project = CoreWebIC OR project = Web) AND (fixVersion = DP-2033) ORDER BY Rank ASC",
+            "mailer": {
+                "fromName": "DP-2033 Push 1 Project Status",
+                "fromEmail": "<FROMEMAIL>",
+                "to": "<TOEMAILS>" 
+            },
+            "schedulers": [
+                {
+                    "dayOfWeek": [1, 2, 3, 4, 5],
+                    "hour": 12,
+                    "minute": 45
+                }
+            ]
         }
     ],
     "express": {
-        "port": 3000
+        "port": 3210
+    },
+    "nodemailer": {
+        "service": "gmail",
+        "auth": {
+                    "user": "<GMAILUSERNAME>",
+                    "pass": "<GMAILPASSWORD>"
+        }
     }
 }

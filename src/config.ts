@@ -9,9 +9,23 @@ export interface JiraConfig {
     strictSSL?: boolean
 }
 
+export interface SearchMailer {
+    fromName: string,
+    fromEmail: string,
+    to: string
+}
+
+export interface SearchScheduler {
+    dayOfWeek: Array<number>,
+    hour: number,
+    minute: number
+}
+
 export interface Search {
     name: string,
     jql: string
+    mailer?: SearchMailer
+    schedulers?: Array<SearchScheduler>
 }
 
 export interface Express {
@@ -21,7 +35,8 @@ export interface Express {
 export interface Config {
     jira: JiraConfig,
     searches: Array<Search>,
-    express: Express
+    express: Express,
+    nodemailer?: any
 }
 
 export let config: Config = null;

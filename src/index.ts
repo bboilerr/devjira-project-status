@@ -6,6 +6,8 @@ import { config, Config, Search } from './config';
 import JiraReportDataGenerator from './JiraReportDataGenerator';
 import Spreadsheet from './Spreadsheet';
 import { ReportData } from './types';
+import Mailer from './Mailer';
+import Scheduler from './Scheduler';
 
 interface CommandLineArguments {
     _: Array<string>,
@@ -15,6 +17,8 @@ interface CommandLineArguments {
 
 class App {
     private express;
+    private mailer: Mailer;
+    private scheduler: Scheduler;
 
     constructor(private config: Config) {
         this.express = express();
@@ -30,6 +34,7 @@ class App {
                 res.status(404).send(`Search not found.`);
             } else {
                 let spreadsheetUrl = await this.generateSpreadsheetForSearch(req.body.search);
+                console.log();
                 res.json({spreadsheetUrl: spreadsheetUrl});
             }
         });
@@ -65,15 +70,25 @@ class App {
                 throw error;
             }
 
+            let title: string = null;
             if (jiraReportData) {
                 try {
                     let spreadsheet = new Spreadsheet(jiraReportData, jiraSearch);
                     spreadsheetUrl = await spreadsheet.generate();
+                    title = spreadsheet.getTitle();
                 } catch (error) {
                     console.error(`Error generating spreadsheet: ${error}`);
                     console.error(error);
                     throw error;
                 }
+            }
+
+            if (spreadsheetUrl && this.mailer && jiraSearch.mailer) {
+                const from = `${jiraSearch.mailer.fromName} <${jiraSearch.mailer.fromEmail}>`;
+                const replyTo = `${jiraSearch.mailer.fromName} <${jiraSearch.mailer.fromEmail}>`;
+                const subject = title;
+                const html = this.mailer.getMailHtml(title, spreadsheetUrl);
+                this.mailer.sendMail(from, replyTo, jiraSearch.mailer.to, subject, undefined, html);
             }
         }
 
@@ -95,6 +110,22 @@ class App {
             process.exit();
         }
 
+        if (this.config.nodemailer) {
+            this.mailer = new Mailer(this.config.nodemailer);
+        }
+
+        this.scheduler = new Scheduler();
+        for (let jiraSearch of this.config.searches) {
+            if (jiraSearch.schedulers) {
+                for (let scheduler of jiraSearch.schedulers) {
+                    this.scheduler.schedule(scheduler, async () => {
+                        await this.generateSpreadsheetForSearch(jiraSearch.name);
+                        console.log();
+                    });
+                }
+            }
+        }
+
         if (args.search) {
             let spreadsheetUrl: string = null;
             try {
@@ -107,6 +138,8 @@ class App {
             if (spreadsheetUrl) {
                 exec(`start chrome "${spreadsheetUrl}"`);
             }
+
+            console.log();
         }
 
         if (args.serve) {

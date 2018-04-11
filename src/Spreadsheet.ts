@@ -19,7 +19,8 @@ interface SprintIssues {
 }
 
 export default class Spreadsheet {
-    private clientSecret;
+    private clientSecret: string;
+    private title: string;
 
     constructor(private reportData: ReportData, private jiraSearch: Search) {
         try {
@@ -28,6 +29,10 @@ export default class Spreadsheet {
             console.error(`Error loading Google client secret: ${error}`);
             console.error(error);
         }
+    }
+
+    public getTitle() {
+        return this.title;
     }
 
     /**
@@ -174,8 +179,8 @@ export default class Spreadsheet {
 
     private generateSpreadsheetPromise(auth) {
         return new Promise((resolve, reject) => {
-            let title = `${this.jiraSearch.name} - Project Status - ${moment().format('MM/DD/YYYY hh:mm:ss A')}`;
-            console.log(`Generating spreadsheet: ${title}`);
+            this.title = `${this.jiraSearch.name} - Project Status - ${moment().format('MM/DD/YYYY hh:mm:ss A')}`;
+            console.log(`Generating spreadsheet: ${this.title}`);
             let sprints = this.processReportData(this.reportData);
             let sheetsToAdd = [];
             for (let sprint of sprints) {
@@ -331,7 +336,7 @@ export default class Spreadsheet {
             sheets.spreadsheets.create({
                 resource: {
                     properties: {
-                        title: title,
+                        title: this.title,
                         locale: 'en_US',
                         timeZone: moment.tz.guess()
                     },
