@@ -1,1 +1,0 @@
-# devjira-project-status
