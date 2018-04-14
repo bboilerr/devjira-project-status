@@ -339,6 +339,10 @@ export default class Mailer {
         <td>&nbsp;</td>
       </tr>
     </table>
+
+    <div style="display: block; width: 100%; height: 200%; border: none">
+      <iframe width="100%" src=${spreadsheetUrl}></iframe>
+    </div>
   </body>
 </html>
         `;

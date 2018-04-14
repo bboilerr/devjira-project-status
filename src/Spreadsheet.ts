@@ -11,6 +11,9 @@ import { exec } from 'child_process';
 import { POINT_CONVERSION_COMPRESSED } from 'constants';
 import { resolve } from 'url';
 
+const SPRINT_BACKLOG = 'Backlog';
+const SPRINT_STATE_ACTIVE = 'ACTIVE';
+
 interface SprintIssues {
     sprint: string,
     sprintData: Sprint,
@@ -143,7 +146,7 @@ export default class Spreadsheet {
         let sprintsMap = new Map();
         for (let issue of this.reportData.reportDataIssues) {
             let sprintIssues = <SprintIssues> {};
-            let sprint = (issue.sprint && issue.sprint.name) || 'Backlog';
+            let sprint = (issue.sprint && issue.sprint.name) || SPRINT_BACKLOG;
 
             if (!sprintsMap.has(sprint)) {
                 sprintIssues.sprint = sprint;
@@ -158,18 +161,16 @@ export default class Spreadsheet {
         }
         let sprints = Array.from(sprintsMap.values());
         sprints.sort((a: SprintIssues, b: SprintIssues) => {
-            if (a.sprintData && !b.sprintData) {
+            if ((a.sprintData && a.sprintData.state === SPRINT_STATE_ACTIVE) && ((b.sprintData && b.sprintData.state !== SPRINT_STATE_ACTIVE) || b.sprint === SPRINT_BACKLOG)) {
                 return -1;
-            } else if (!a.sprintData && b.sprintData) {
+            } else if (((a.sprintData && a.sprintData.state != SPRINT_STATE_ACTIVE) || a.sprint === SPRINT_BACKLOG) && (b.sprintData && b.sprintData.state === SPRINT_STATE_ACTIVE)) {
+                return 1;
+            } else if (a.sprint === SPRINT_BACKLOG && b.sprint !== SPRINT_BACKLOG) {
+                return -1;
+            } else if (a.sprint !== SPRINT_BACKLOG && b.sprint === SPRINT_BACKLOG) {
                 return 1;
             } else if (a.sprintData && b.sprintData) {
-                if (a.sprintData.state === 'ACTIVE' && b.sprintData.state !== 'ACTIVE') {
-                    return -1;
-                } else if (a.sprintData.state !== 'ACTIVE' && b.sprintData.state === 'ACTIVE') {
-                    return 1;
-                } else if (a.sprint != b.sprint) {
-                    return b.sprintData.id - a.sprintData.id;
-                }
+                return b.sprintData.id - a.sprintData.id;
             }
 
             return a.sprint.localeCompare(b.sprint);
@@ -194,21 +195,24 @@ export default class Spreadsheet {
                 // resolved story points
                 let resolvedStoryPoints = sprint.issues.reduce((val, issue) => {
                     if (issue.status === 'Resolved' && issue.storyPoints) {
-                        val += issue.storyPoints;
+                        const add = (issue.storyPoints > 0) ? issue.storyPoints : 0;
+                        val += add;
                     }
                     return val;
                 }, 0);
                 // unresolved story points
                 let unresolvedStoryPoints = sprint.issues.reduce((val, issue) => {
                     if (issue.status !== 'Resolved' && issue.storyPoints) {
-                        val += issue.storyPoints;
+                        const add = (issue.storyPoints > 0) ? issue.storyPoints : 0;
+                        val += add;
                     }
                     return val;
                 }, 0);
                 // unresolved story points remaining
                 let unresolvedStoryPointsRemaining = sprint.issues.reduce((val, issue) => {
                     if (issue.status !== 'Resolved' && issue.storyPointsRemaining) {
-                        val += issue.storyPointsRemaining;
+                        const add = (issue.storyPointsRemaining > 0) ? issue.storyPointsRemaining : 0;
+                        val += add;
                     }
                     return val;
                 }, 0);
@@ -224,13 +228,16 @@ export default class Spreadsheet {
 
                     if (issue.storyPoints) {
                         if (issue.status === 'Resolved') {
-                            users[issue.assignee].resolvedStoryPoints += issue.storyPoints;
+                            const add = (issue.storyPoints > 0) ? issue.storyPoints : 0;
+                            users[issue.assignee].resolvedStoryPoints += add;
                         } else {
-                            users[issue.assignee].unresolvedStoryPoints += issue.storyPoints;
+                            const add = (issue.storyPoints > 0) ? issue.storyPoints : 0;
+                            users[issue.assignee].unresolvedStoryPoints += add;
                         }
                     }
                     if (issue.storyPointsRemaining && issue.status !== 'Resolved') {
-                        users[issue.assignee].unresolvedStoryPointsRemaining += issue.storyPointsRemaining;
+                        const add = (issue.storyPointsRemaining > 0) ? issue.storyPointsRemaining : 0;
+                        users[issue.assignee].unresolvedStoryPointsRemaining += add;
                     }
                     return users;
                 }, {});
