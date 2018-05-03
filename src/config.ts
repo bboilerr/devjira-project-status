@@ -5,6 +5,7 @@ export interface JiraConfig {
     host: string,
     username: string,
     password: string,
+    moscow?: Array<string>
     apiVersion?: string,
     strictSSL?: boolean
 }

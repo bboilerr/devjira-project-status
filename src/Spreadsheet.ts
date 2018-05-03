@@ -1,8 +1,8 @@
 import * as fs from 'fs';
 import * as readline from 'readline';
 import * as moment from 'moment-timezone';
-import { Sprint, ReportDataIssue, ReportData } from './types';
-import { Search } from './config';
+import { Sprint, ReportDataIssue, ReportData, SprintStats } from './types';
+import { Config, Search } from './config';
 import { google } from 'googleapis';
 const OAuth2Client = google.auth.OAuth2;
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets', 'https://www.googleapis.com/auth/drive.file'];
@@ -24,8 +24,9 @@ interface SprintIssues {
 export default class Spreadsheet {
     private clientSecret: string;
     private title: string;
+    public sprintStats: Array<SprintStats> = [];
 
-    constructor(private reportData: ReportData, private jiraSearch: Search) {
+    constructor(private reportData: ReportData, private jiraSearch: Search, private config: Config) {
         try {
             this.clientSecret = JSON.parse(fs.readFileSync('src/client-secret.json').toString());
         } catch (error) {
@@ -192,6 +193,15 @@ export default class Spreadsheet {
                     data: []
                 };
 
+                let thisSprintStats = {
+                    resolvedStoryPoints: 0,
+                    unresolvedStoryPoints: 0,
+                    unresolvedEstimatedDaysRemaining: 0,
+                    moscowStoryPoints: [],
+                    userStoryPoints: {}
+                };
+                this.sprintStats.push({ sprint: sprint.sprint, stat: thisSprintStats});
+
                 // resolved story points
                 let resolvedStoryPoints = sprint.issues.reduce((val, issue) => {
                     if (issue.status === 'Resolved' && issue.storyPoints) {
@@ -200,6 +210,7 @@ export default class Spreadsheet {
                     }
                     return val;
                 }, 0);
+                thisSprintStats.resolvedStoryPoints = resolvedStoryPoints;
                 // unresolved story points
                 let unresolvedStoryPoints = sprint.issues.reduce((val, issue) => {
                     if (issue.status !== 'Resolved' && issue.storyPoints) {
@@ -208,21 +219,51 @@ export default class Spreadsheet {
                     }
                     return val;
                 }, 0);
+                thisSprintStats.unresolvedStoryPoints = unresolvedStoryPoints;
                 // unresolved story points remaining
-                let unresolvedStoryPointsRemaining = sprint.issues.reduce((val, issue) => {
-                    if (issue.status !== 'Resolved' && issue.storyPointsRemaining) {
-                        const add = (issue.storyPointsRemaining > 0) ? issue.storyPointsRemaining : 0;
+                let unresolvedEstimatedDaysRemaining = sprint.issues.reduce((val, issue) => {
+                    if (issue.status !== 'Resolved' && issue.estimatedDaysRemaining) {
+                        const add = (issue.estimatedDaysRemaining > 0) ? issue.estimatedDaysRemaining : 0;
                         val += add;
                     }
                     return val;
                 }, 0);
+                thisSprintStats.unresolvedEstimatedDaysRemaining = unresolvedEstimatedDaysRemaining;
+
+                let moscowStoryPoints = sprint.issues.reduce((moscows, issue) => {
+                    if (issue.moscow) {
+                        if (!(issue.moscow in moscows)) {
+                            moscows[issue.moscow] = {
+                                resolvedStoryPoints: 0,
+                                unresolvedStoryPoints: 0,
+                                unresolvedEstimatedDaysRemaining: 0
+                            };
+                        }
+
+                        if (issue.storyPoints) {
+                            if (issue.status === 'Resolved') {
+                                const add = (issue.storyPoints > 0) ? issue.storyPoints : 0;
+                                moscows[issue.moscow].resolvedStoryPoints += add;
+                            } else {
+                                const add = (issue.storyPoints > 0) ? issue.storyPoints : 0;
+                                moscows[issue.moscow].unresolvedStoryPoints += add;
+                            }
+                        }
+                        if (issue.estimatedDaysRemaining && issue.status !== 'Resolved') {
+                            const add = (issue.estimatedDaysRemaining > 0) ? issue.estimatedDaysRemaining : 0;
+                            moscows[issue.moscow].unresolvedEstimatedDaysRemaining += add;
+                        }
+                    }
+                    return moscows;
+                }, {});
+
                 // user story points
                 let userStoryPoints = sprint.issues.reduce((users, issue) => {
                     if (!(issue.assignee in users)) {
                         users[issue.assignee] = {
                             resolvedStoryPoints: 0,
                             unresolvedStoryPoints: 0,
-                            unresolvedStoryPointsRemaining: 0
+                            unresolvedEstimatedDaysRemaining: 0
                         };
                     }
 
@@ -235,12 +276,13 @@ export default class Spreadsheet {
                             users[issue.assignee].unresolvedStoryPoints += add;
                         }
                     }
-                    if (issue.storyPointsRemaining && issue.status !== 'Resolved') {
-                        const add = (issue.storyPointsRemaining > 0) ? issue.storyPointsRemaining : 0;
-                        users[issue.assignee].unresolvedStoryPointsRemaining += add;
+                    if (issue.estimatedDaysRemaining && issue.status !== 'Resolved') {
+                        const add = (issue.estimatedDaysRemaining > 0) ? issue.estimatedDaysRemaining : 0;
+                        users[issue.assignee].unresolvedEstimatedDaysRemaining += add;
                     }
                     return users;
                 }, {});
+                thisSprintStats.userStoryPoints = userStoryPoints;
 
                 let statRowData = [
                     {
@@ -263,11 +305,37 @@ export default class Spreadsheet {
                     },
                     {
                         values: [
-                            { userEnteredValue: { stringValue: 'Unesolved Story Points Remaining' } },
-                            { userEnteredValue: { numberValue: unresolvedStoryPointsRemaining } },
+                            { userEnteredValue: { stringValue: 'Unesolved Estimated Days Remaining' } },
+                            { userEnteredValue: { numberValue: unresolvedEstimatedDaysRemaining } },
                         ]
                     },
                 ];
+
+                if (this.config.jira.moscow) {
+                    for (let moscow of this.config.jira.moscow) {
+                        if (moscow in moscowStoryPoints) {
+                            statRowData.push({
+                                values: [
+                                    { userEnteredValue: { stringValue: `${moscow} - Resolved Story Points` } },
+                                    { userEnteredValue: { numberValue: moscowStoryPoints[moscow].resolvedStoryPoints } },
+                                ]
+                            });
+                            statRowData.push({
+                                values: [
+                                    { userEnteredValue: { stringValue: `${moscow} - Unresolved Story Points` } },
+                                    { userEnteredValue: { numberValue: moscowStoryPoints[moscow].unresolvedStoryPoints } },
+                                ]
+                            });
+                            statRowData.push({
+                                values: [
+                                    { userEnteredValue: { stringValue: `${moscow} - Unresolved Estimated Days Remaining` } },
+                                    { userEnteredValue: { numberValue: moscowStoryPoints[moscow].unresolvedEstimatedDaysRemaining } },
+                                ]
+                            });
+                            thisSprintStats.moscowStoryPoints.push({moscow: moscow, moscowStoryPoints: moscowStoryPoints[moscow]});
+                        }
+                    }
+                }
 
                 for (let user in userStoryPoints) {
                     statRowData.push({
@@ -284,8 +352,8 @@ export default class Spreadsheet {
                     });
                     statRowData.push({
                         values: [
-                            { userEnteredValue: { stringValue: `${user} - Unresolved Story Points Remaining` } },
-                            { userEnteredValue: { numberValue: userStoryPoints[user].unresolvedStoryPointsRemaining } },
+                            { userEnteredValue: { stringValue: `${user} - Unresolved Estimated Days Remaining` } },
+                            { userEnteredValue: { numberValue: userStoryPoints[user].unresolvedEstimatedDaysRemaining } },
                         ]
                     });
                 }
@@ -303,15 +371,17 @@ export default class Spreadsheet {
                     startColumn: 0,
                     rowData: [{
                         values: [
-                            { userEnteredValue: { stringValue: 'Epic' } },
                             { userEnteredValue: { stringValue: 'Type' } },
                             { userEnteredValue: { stringValue: 'Assignee' } },
                             { userEnteredValue: { stringValue: 'Issue' } },
                             { userEnteredValue: { stringValue: 'URI' } },
                             { userEnteredValue: { stringValue: 'Status' } },
+                            { userEnteredValue: { stringValue: 'Epic' } },
                             { userEnteredValue: { stringValue: 'Story Points' } },
-                            { userEnteredValue: { stringValue: 'Story Points Remaining' } },
-                            { userEnteredValue: { stringValue: 'Summary' } }
+                            { userEnteredValue: { stringValue: 'Original Days Estimated' } },
+                            { userEnteredValue: { stringValue: 'Estimated Days Remaining' } },
+                            { userEnteredValue: { stringValue: 'Summary' } },
+                            { userEnteredValue: { stringValue: 'MoSCoW' } },
                         ]
                     }]
                 });
@@ -322,15 +392,17 @@ export default class Spreadsheet {
                     rowData: sprint.issues.map(issue => {
                         return {
                             values: [
-                                { userEnteredValue: { stringValue: issue.epic } },
                                 { userEnteredValue: { stringValue: issue.issueType } },
                                 { userEnteredValue: { stringValue: issue.assignee } },
                                 { userEnteredValue: { stringValue: issue.issue } },
                                 { userEnteredValue: { stringValue: issue.uri } },
                                 { userEnteredValue: { stringValue: issue.status } },
+                                { userEnteredValue: { stringValue: issue.epic } },
                                 { userEnteredValue: { numberValue: issue.storyPoints } },
-                                { userEnteredValue: { numberValue: issue.storyPointsRemaining } },
-                                { userEnteredValue: { stringValue: issue.summary } }
+                                { userEnteredValue: { numberValue: issue.originalEstimate } },
+                                { userEnteredValue: { numberValue: issue.estimatedDaysRemaining } },
+                                { userEnteredValue: { stringValue: issue.summary } },
+                                { userEnteredValue: { stringValue: issue.moscow } }
                             ]
                         }
                     })
@@ -447,7 +519,7 @@ export default class Spreadsheet {
                                     startRowIndex: sprints[index].dataHeaderStartRow,
                                     endRowIndex: sprints[index].dataHeaderStartRow + 1,
                                     startColumnIndex: 0,
-                                    endColumnIndex: 9
+                                    endColumnIndex: 11
                                 },
                                 cell: headerRowCellFormat,
                                 fields: 'userEnteredFormat(borders,textFormat,horizontalAlignment)'

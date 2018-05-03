@@ -18,9 +18,25 @@ export interface ReportDataIssue {
     epic: string,
     created: string,
     storyPoints: number,
-    storyPointsRemaining: number
+    originalEstimate: number,
+    remainingEstimate: number,
+    estimatedDaysRemaining: number,
+    moscow: string
 }
 
 export interface ReportData {
     reportDataIssues: Array<ReportDataIssue>,
+}
+
+export interface SprintStat {
+    resolvedStoryPoints: number;
+    unresolvedStoryPoints: number,
+    unresolvedEstimatedDaysRemaining: number;
+    moscowStoryPoints: Array<any>;
+    userStoryPoints: any;
+}
+
+export interface SprintStats {
+    sprint: string;
+    stat: SprintStat;
 }

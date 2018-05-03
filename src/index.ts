@@ -71,9 +71,10 @@ class App {
             }
 
             let title: string = null;
+            let spreadsheet: Spreadsheet = null;
             if (jiraReportData) {
                 try {
-                    let spreadsheet = new Spreadsheet(jiraReportData, jiraSearch);
+                    spreadsheet = new Spreadsheet(jiraReportData, jiraSearch, config);
                     spreadsheetUrl = await spreadsheet.generate();
                     title = spreadsheet.getTitle();
                 } catch (error) {
@@ -87,7 +88,7 @@ class App {
                 const from = `${jiraSearch.mailer.fromName} <${jiraSearch.mailer.fromEmail}>`;
                 const replyTo = `${jiraSearch.mailer.fromName} <${jiraSearch.mailer.fromEmail}>`;
                 const subject = title;
-                const html = this.mailer.getMailHtml(title, spreadsheetUrl);
+                const html = this.mailer.getMailHtml(title, spreadsheetUrl, spreadsheet.sprintStats);
                 this.mailer.sendMail(from, replyTo, jiraSearch.mailer.to, subject, undefined, html);
             }
         }

@@ -3,7 +3,13 @@
         "protocol": "https",
         "host": "devjira.inin.com",
         "username": "<USERNAME>",
-        "password": "<PASSWORD>"
+        "password": "<PASSWORD>",
+        "moscow": [
+            "MUST",
+            "SHOULD",
+            "COULD",
+            "WONT"
+        ]
     },
     "searches": [
         {

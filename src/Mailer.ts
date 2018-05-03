@@ -1,5 +1,6 @@
 import * as nodemailer from 'nodemailer';
 import { config } from './config';
+import { SprintStats, SprintStat, Sprint } from './types';
 
 export default class Mailer {
     transporter = null;
@@ -32,7 +33,83 @@ export default class Mailer {
         return await this.transporter.sendMail(sendMailOptions);
     }
 
-    public getMailHtml(title: string, spreadsheetUrl: string) {
+    public getMailHtml(title: string, spreadsheetUrl: string, sprintStats: Array<SprintStats>) {
+      let sprintStatsToShow: Array<SprintStats> = [];
+
+      for (let sprintStat of sprintStats) {
+        sprintStatsToShow.push(sprintStat);
+        if (sprintStat.sprint === 'Backlog') {
+          break;
+        }
+      }
+
+      let sprintStatsTable = `
+        <table border="1" cellpadding="0" cellspacing="0" class="btn btn-primary">
+          <thead>
+            <tr>`;
+
+      for (let sprintStatToShow of sprintStatsToShow) {
+        sprintStatsTable += `
+              <th colspan="2">
+                ${sprintStatToShow.sprint}
+              </th>`;
+      }
+
+      sprintStatsTable += `
+            </tr>
+          </thead>
+          <tbody>
+      `;
+
+      let tableColumns = [];
+      for (let sprintStatToShow of sprintStatsToShow) {
+        let tableColumn1 = [];
+        let tableColumn2 = [];
+        tableColumn1.push(`<th>Resolved Story Points</th>`);
+        tableColumn2.push(`<td align="center">${sprintStatToShow.stat.resolvedStoryPoints}</td>`);
+        tableColumn1.push(`<th>Unresolved Story Points</th>`);
+        tableColumn2.push(`<td align="center">${sprintStatToShow.stat.unresolvedStoryPoints}</td>`);
+        tableColumn1.push(`<th>Unresolved Estimated Days Remaining</th>`);
+        tableColumn2.push(`<td align="center">${sprintStatToShow.stat.unresolvedEstimatedDaysRemaining}</td>`);
+        for (let moscowStat of sprintStatToShow.stat.moscowStoryPoints) {
+          tableColumn1.push(`<th>${moscowStat.moscow} - Resolved Story Points</th>`);
+          tableColumn2.push(`<td align="center">${moscowStat.moscowStoryPoints.resolvedStoryPoints}</td>`);
+          tableColumn1.push(`<th>${moscowStat.moscow} - Unresolved Story Points</th>`);
+          tableColumn2.push(`<td align="center">${moscowStat.moscowStoryPoints.unresolvedStoryPoints}</td>`);
+          tableColumn1.push(`<th>${moscowStat.moscow} - Unresolved Estimated Days Remaining</th>`);
+          tableColumn2.push(`<td align="center">${moscowStat.moscowStoryPoints.unresolvedEstimatedDaysRemaining}</td>`);
+        }
+        for (let user in sprintStatToShow.stat.userStoryPoints) {
+          tableColumn1.push(`<th>${user} - Resolved Story Points</th>`);
+          tableColumn2.push(`<td align="center">${sprintStatToShow.stat.userStoryPoints[user].resolvedStoryPoints}</td>`);
+          tableColumn1.push(`<th>${user} - Unresolved Story Points</th>`);
+          tableColumn2.push(`<td align="center">${sprintStatToShow.stat.userStoryPoints[user].unresolvedStoryPoints}</td>`);
+          tableColumn1.push(`<th>${user} - Unresolved Estimated Days Remaining</th>`);
+          tableColumn2.push(`<td align="center">${sprintStatToShow.stat.userStoryPoints[user].unresolvedEstimatedDaysRemaining}</td>`);
+        }
+        tableColumns.push(tableColumn1);
+        tableColumns.push(tableColumn2);
+      }
+
+      let rows = Math.max(...tableColumns.map(tableColumn => tableColumn.length));
+
+      for (let i = 0; i < rows; i++) {
+        sprintStatsTable += '<tr>';
+        for (let tableColumn of tableColumns) {
+          if (i < tableColumn.length) {
+            sprintStatsTable += `${tableColumn[i]}`;
+          } else {
+            sprintStatsTable += '<td></td>';
+          }
+        }
+        sprintStatsTable += '</tr>';
+      }
+
+      sprintStatsTable += `
+        </tbody>
+      </table>
+      `;
+
         return `
 <!doctype html>
 <html>
@@ -78,15 +155,15 @@ export default class Mailer {
         display: block;
         Margin: 0 auto !important;
         /* makes it centered */
-        max-width: 580px;
+        max-width: 960px;
         padding: 10px;
-        width: 580px; }
+        width: 960px; }
       /* This should also be a block element, so that it will fill 100% of the .container */
       .content {
         box-sizing: border-box;
         display: block;
         Margin: 0 auto;
-        max-width: 580px;
+        max-width: 960px;
         padding: 10px; }
       /* -------------------------------------
           HEADER, FOOTER, MAIN
@@ -221,7 +298,7 @@ export default class Mailer {
       /* -------------------------------------
           RESPONSIVE AND MOBILE FRIENDLY STYLES
       ------------------------------------- */
-      @media only screen and (max-width: 620px) {
+      @media only screen and (max-width: 1000px) {
         table[class=body] h1 {
           font-size: 28px !important;
           margin-bottom: 10px !important; }
@@ -312,6 +389,7 @@ export default class Mailer {
                             </tr>
                           </tbody>
                         </table>
+                        ${sprintStatsTable}
                       </td>
                     </tr>
                   </table>

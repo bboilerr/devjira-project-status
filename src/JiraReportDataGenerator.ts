@@ -87,6 +87,10 @@ export default class JiraReportDataGenerator {
             const FIELD_STORY_POINTS = this.jiraFields.byName['Story Points'].id;
             const FIELD_TIME_SPENT = this.jiraFields.byName['Time Spent'].id;
             const FIELD_CREATED = this.jiraFields.byName['Created'].id;
+            const FIELD_ORIGINAL_ESTIMATE = this.jiraFields.byName['Original Estimate'].id;
+            const FIELD_REMAINING_ESTIMATE = this.jiraFields.byName['Remaining Estimate'].id;
+            const FIELD_DEVELOPMENT_LABELS = this.jiraFields.byName['Development Labels'].id;
+
             let issuesByKey = this.jiraIssues.reduce((map, issue) => {
                 map[issue.key] = issue;
                 return map;
@@ -102,15 +106,22 @@ export default class JiraReportDataGenerator {
                 reportDataIssue.created = ((FIELD_CREATED in issue.fields) && issue.fields[FIELD_CREATED]);
                 reportDataIssue.status = ((FIELD_STATUS in issue.fields) && issue.fields[FIELD_STATUS] && issue.fields[FIELD_STATUS].name);
                 reportDataIssue.storyPoints = ((FIELD_STORY_POINTS in issue.fields) && issue.fields[FIELD_STORY_POINTS]);
-                reportDataIssue.storyPointsRemaining = null;
-                if (reportDataIssue.storyPoints) {
+                reportDataIssue.originalEstimate = ((FIELD_ORIGINAL_ESTIMATE in issue.fields) && issue.fields[FIELD_ORIGINAL_ESTIMATE]);
+                if (reportDataIssue.originalEstimate) {
+                    reportDataIssue.originalEstimate /= (60 * 60 * 8);
+                }
+                reportDataIssue.remainingEstimate = ((FIELD_REMAINING_ESTIMATE in issue.fields) && issue.fields[FIELD_REMAINING_ESTIMATE]);
+                reportDataIssue.estimatedDaysRemaining = null;
+                if (reportDataIssue.remainingEstimate) {
+                    reportDataIssue.estimatedDaysRemaining = reportDataIssue.remainingEstimate / (60 * 60 * 8);
+                } else if (reportDataIssue.storyPoints) {
                     let timeSpent = ((FIELD_TIME_SPENT in issue.fields) && issue.fields[FIELD_TIME_SPENT]);
                     if (timeSpent) {
                         // Time spent in work days
                         timeSpent /= (60 * 60 * 8);
-                        reportDataIssue.storyPointsRemaining = reportDataIssue.storyPoints - timeSpent;
+                        reportDataIssue.estimatedDaysRemaining = reportDataIssue.storyPoints - timeSpent;
                     } else {
-                        reportDataIssue.storyPointsRemaining = reportDataIssue.storyPoints;
+                        reportDataIssue.estimatedDaysRemaining = reportDataIssue.storyPoints;
                     }
                 }
                 reportDataIssue.sprint = null;
@@ -153,6 +164,16 @@ export default class JiraReportDataGenerator {
                         reportDataIssue.epic = `${epicIssue.key} - ${epicIssue.fields[FIELD_EPIC_NAME]}`;
                     }
                 }
+                if (this.config.jira.moscow && this.config.jira.moscow.length) {
+                    const developmentLabels = ((FIELD_DEVELOPMENT_LABELS in issue.fields) && issue.fields[FIELD_DEVELOPMENT_LABELS]);
+                    if (developmentLabels) {
+                        for (let moscow of this.config.jira.moscow) {
+                            if (developmentLabels.find(devLabel => devLabel === moscow)) {
+                                reportDataIssue.moscow = moscow;
+                            }
+                        }
+                    }
+                }
                 return reportDataIssue;
             });
             reportData.reportDataIssues = [];
@@ -175,6 +196,17 @@ export default class JiraReportDataGenerator {
                         } else if (a.sprint.id !== b.sprint.id) {
                             return a.sprint.id - b.sprint.id;
                         }
+                    }
+                }
+
+                // Sort by MoSCoW, in order of config
+                if (a.moscow || b.moscow) {
+                    if (a.moscow && !b.moscow) {
+                        return -1;
+                    } else if (!a.moscow && b.moscow) {
+                        return 1;
+                    } else {
+                        return this.config.jira.moscow.findIndex(moscow => moscow === a.moscow) - this.config.jira.moscow.findIndex(moscow => moscow === b.moscow);
                     }
                 }
 
