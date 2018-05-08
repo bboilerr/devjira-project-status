@@ -12,6 +12,8 @@
             "runtimeArgs": [
                 "run",
                 "debug",
+                "--",
+                "--serve"
             ],
             "port": 9229
         }

@@ -65,6 +65,10 @@ export default class Mailer {
       for (let sprintStatToShow of sprintStatsToShow) {
         let tableColumn1 = [];
         let tableColumn2 = [];
+        if (sprintStatToShow.stat.daysRemainingInActiveSprint) {
+          tableColumn1.push(`<th>Sprint Days Remaining</th>`);
+          tableColumn2.push(`<td align="center">${sprintStatToShow.stat.daysRemainingInActiveSprint}</td>`);
+        }
         tableColumn1.push(`<th>Resolved Story Points</th>`);
         tableColumn2.push(`<td align="center">${sprintStatToShow.stat.resolvedStoryPoints}</td>`);
         tableColumn1.push(`<th>Unresolved Story Points</th>`);

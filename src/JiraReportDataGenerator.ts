@@ -138,11 +138,11 @@ export default class JiraReportDataGenerator {
                         } else if (data[0] === 'state') {
                             sprint.state = data[1];
                         } else if (data[0] === 'startDate') {
-                            sprint.startDate = data[1];
+                            sprint.startDate = data[1] !== '<null>' ? moment(data[1]).toISOString() : undefined;
                         } else if (data[0] === 'endDate') {
-                            sprint.endDate = moment(data[1]).toISOString();
+                            sprint.endDate = data[1] !== '<null>' ? moment(data[1]).toISOString() : undefined;
                         } else if (data[0] === 'completedDate') {
-                            sprint.completedDate = moment(data[1]).toISOString();
+                            sprint.completedDate = data[1] !== '<null>' ? moment(data[1]).toISOString() : undefined;
                         }
                     }
 

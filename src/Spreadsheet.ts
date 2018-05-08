@@ -198,7 +198,8 @@ export default class Spreadsheet {
                     unresolvedStoryPoints: 0,
                     unresolvedEstimatedDaysRemaining: 0,
                     moscowStoryPoints: [],
-                    userStoryPoints: {}
+                    userStoryPoints: {},
+                    daysRemainingInActiveSprint: (sprint.sprintData && sprint.sprintData.state === SPRINT_STATE_ACTIVE) ? moment(sprint.sprintData.endDate).diff(moment(), 'days') : undefined
                 };
                 this.sprintStats.push({ sprint: sprint.sprint, stat: thisSprintStats});
 
@@ -284,13 +285,24 @@ export default class Spreadsheet {
                 }, {});
                 thisSprintStats.userStoryPoints = userStoryPoints;
 
-                let statRowData = [
-                    {
+                let statRowData = [];
+                statRowData.push({
                         values: [
                             { userEnteredValue: { stringValue: 'Sprint' } },
                             { userEnteredValue: { stringValue: sprint.sprint } },
                         ]
-                    },
+                });
+
+                if (thisSprintStats.daysRemainingInActiveSprint) {
+                    statRowData.push({
+                        values: [
+                            { userEnteredValue: { stringValue: 'Sprint Days Remaining' } },
+                            { userEnteredValue: { numberValue: thisSprintStats.daysRemainingInActiveSprint } },
+                        ]
+                    });
+                }
+
+                statRowData.concat([
                     {
                         values: [
                             { userEnteredValue: { stringValue: 'Resolved Story Points' } },
@@ -309,7 +321,7 @@ export default class Spreadsheet {
                             { userEnteredValue: { numberValue: unresolvedEstimatedDaysRemaining } },
                         ]
                     },
-                ];
+                ]);
 
                 if (this.config.jira.moscow) {
                     for (let moscow of this.config.jira.moscow) {

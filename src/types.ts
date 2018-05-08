@@ -34,6 +34,7 @@ export interface SprintStat {
     unresolvedEstimatedDaysRemaining: number;
     moscowStoryPoints: Array<any>;
     userStoryPoints: any;
+    daysRemainingInActiveSprint?: number;
 }
 
 export interface SprintStats {
