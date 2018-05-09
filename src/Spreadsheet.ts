@@ -13,6 +13,7 @@ import { resolve } from 'url';
 
 const SPRINT_BACKLOG = 'Backlog';
 const SPRINT_STATE_ACTIVE = 'ACTIVE';
+const SPRINT_STATE_FUTURE = 'FUTURE';
 
 interface SprintIssues {
     sprint: string,
@@ -165,6 +166,10 @@ export default class Spreadsheet {
             if ((a.sprintData && a.sprintData.state === SPRINT_STATE_ACTIVE) && ((b.sprintData && b.sprintData.state !== SPRINT_STATE_ACTIVE) || b.sprint === SPRINT_BACKLOG)) {
                 return -1;
             } else if (((a.sprintData && a.sprintData.state != SPRINT_STATE_ACTIVE) || a.sprint === SPRINT_BACKLOG) && (b.sprintData && b.sprintData.state === SPRINT_STATE_ACTIVE)) {
+                return 1;
+            } else if ((a.sprintData && a.sprintData.state === SPRINT_STATE_FUTURE) && ((b.sprintData && b.sprintData.state !== SPRINT_STATE_FUTURE) || b.sprint === SPRINT_BACKLOG)) {
+                return -1;
+            } else if (((a.sprintData && a.sprintData.state != SPRINT_STATE_FUTURE) || a.sprint === SPRINT_BACKLOG) && (b.sprintData && b.sprintData.state === SPRINT_STATE_FUTURE)) {
                 return 1;
             } else if (a.sprint === SPRINT_BACKLOG && b.sprint !== SPRINT_BACKLOG) {
                 return -1;
