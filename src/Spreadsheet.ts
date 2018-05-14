@@ -298,7 +298,7 @@ export default class Spreadsheet {
                         ]
                 });
 
-                if (thisSprintStats.daysRemainingInActiveSprint) {
+                if (thisSprintStats.daysRemainingInActiveSprint !== undefined) {
                     statRowData.push({
                         values: [
                             { userEnteredValue: { stringValue: 'Sprint Days Remaining' } },
