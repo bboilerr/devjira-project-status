@@ -307,7 +307,7 @@ export default class Spreadsheet {
                     });
                 }
 
-                statRowData.concat([
+                statRowData = statRowData.concat([
                     {
                         values: [
                             { userEnteredValue: { stringValue: 'Resolved Story Points' } },
@@ -388,17 +388,17 @@ export default class Spreadsheet {
                     startColumn: 0,
                     rowData: [{
                         values: [
-                            { userEnteredValue: { stringValue: 'Type' } },
+                            { userEnteredValue: { stringValue: 'Summary' } },
                             { userEnteredValue: { stringValue: 'Assignee' } },
-                            { userEnteredValue: { stringValue: 'Issue' } },
                             { userEnteredValue: { stringValue: 'URI' } },
+                            { userEnteredValue: { stringValue: 'Issue' } },
                             { userEnteredValue: { stringValue: 'Status' } },
+                            { userEnteredValue: { stringValue: 'MoSCoW' } },
                             { userEnteredValue: { stringValue: 'Epic' } },
                             { userEnteredValue: { stringValue: 'Story Points' } },
                             { userEnteredValue: { stringValue: 'Original Days Estimated' } },
                             { userEnteredValue: { stringValue: 'Estimated Days Remaining' } },
-                            { userEnteredValue: { stringValue: 'Summary' } },
-                            { userEnteredValue: { stringValue: 'MoSCoW' } },
+                            { userEnteredValue: { stringValue: 'Type' } }
                         ]
                     }]
                 });
@@ -409,17 +409,17 @@ export default class Spreadsheet {
                     rowData: sprint.issues.map(issue => {
                         return {
                             values: [
-                                { userEnteredValue: { stringValue: issue.issueType } },
+                                { userEnteredValue: { stringValue: issue.summary } },
                                 { userEnteredValue: { stringValue: issue.assignee } },
-                                { userEnteredValue: { stringValue: issue.issue } },
                                 { userEnteredValue: { stringValue: issue.uri } },
+                                { userEnteredValue: { stringValue: issue.issue } },
                                 { userEnteredValue: { stringValue: issue.status } },
+                                { userEnteredValue: { stringValue: issue.moscow } },
                                 { userEnteredValue: { stringValue: issue.epic } },
                                 { userEnteredValue: { numberValue: issue.storyPoints } },
                                 { userEnteredValue: { numberValue: issue.originalEstimate } },
                                 { userEnteredValue: { numberValue: issue.estimatedDaysRemaining } },
-                                { userEnteredValue: { stringValue: issue.summary } },
-                                { userEnteredValue: { stringValue: issue.moscow } }
+                                { userEnteredValue: { stringValue: issue.issueType } }
                             ]
                         }
                     })
